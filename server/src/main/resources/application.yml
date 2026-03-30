@@ -1,0 +1,9 @@
+server:
+  port: 5001
+
+spring:
+  application:
+    name: server
+
+ttp:
+    url: http://localhost:5000

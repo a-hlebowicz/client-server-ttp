@@ -1,0 +1,12 @@
+server:
+  port: 5002
+
+spring:
+  application:
+    name: client
+
+ttp:
+  url: http://localhost:5000
+
+app-server:                       #Musi być app-server bo server jest już zajęte na początku
+  url: http://localhost:5001
