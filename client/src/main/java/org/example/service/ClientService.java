@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Base64;
 import java.util.Map;
+import org.example.crypto.CryptoUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -36,44 +37,27 @@ public class ClientService {
         registerWithTtp();
     }
     private void generateKeys() {
-        try {
-            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-            generator.initialize(4096);
-            this.clientKeyPair = generator.generateKeyPair();
-            System.out.println("Client: Wygenerowano pare kluczy RSA-4096");
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Blad generowania kluczy RSA", e);
-        }
+        this.clientKeyPair = CryptoUtils.generateRSAKeyPair();
+        System.out.println("Client: Wygenerowano pare kluczy RSA-4096");
     }
 
     private void generateId() {
-        try {
-            String raw = "Client_" + System.currentTimeMillis();
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
-            this.clientId = Base64.getEncoder().encodeToString(hash);
-            System.out.println("Client: Wygenerowano ID: " + clientId);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Blad generowania SHA-256", e);
-        }
+        this.clientId = CryptoUtils.generateId("Client");
+        System.out.println("Client: Wygenerowano ID: " + clientId);
     }
 
     private void registerWithTtp() {
         try {
             //pobieramy klucz publiczny ttp
             Map response = restTemplate.getForObject(ttpUrl + "/api/ttp-public-key", Map.class);
-            byte[] ttpPublicKeyBytes = Base64.getDecoder().decode((String) response.get("publicKey"));
-            PublicKey ttpPublicKey = KeyFactory.getInstance("RSA").generatePublic(new java.security.spec.X509EncodedKeySpec(ttpPublicKeyBytes));
+            PublicKey ttpPublicKey = CryptoUtils.base64ToPublicKey((String) response.get("publicKey"));
             System.out.println("Client: Pobrano klucz publiczny TTP");
 
             //szyfrujemy ID kluczem publicznym ttp
-            Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, ttpPublicKey);
-            byte[] encryptedId = cipher.doFinal(clientId.getBytes(StandardCharsets.UTF_8));
-            String encryptedIdBase64 = Base64.getEncoder().encodeToString(encryptedId);
+            String encryptedIdBase64 = CryptoUtils.encryptWithPublicKey(ttpPublicKey, clientId);
 
             //wysylamy rejestracje do ttp
-            String publicKeyBase64 = Base64.getEncoder().encodeToString(clientKeyPair.getPublic().getEncoded());
+            String publicKeyBase64 = CryptoUtils.publicKeyToBase64(clientKeyPair.getPublic());
             RegisterRequest request = new RegisterRequest(encryptedIdBase64, publicKeyBase64, "Client");
             RegisterResponse regResponse = restTemplate.postForObject(
                     ttpUrl + "/api/register", request, RegisterResponse.class);

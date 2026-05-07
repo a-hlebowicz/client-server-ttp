@@ -1,6 +1,7 @@
 package org.example.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.crypto.CryptoUtils;
 import org.example.data.TtpDataStore;
 import org.example.dto.RegisterRequest;
 import org.example.dto.RegisterResponse;
@@ -9,9 +10,7 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.security.*;
 
-import javax.crypto.Cipher;
 import java.security.cert.X509Certificate;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 import org.bouncycastle.cert.X509v3CertificateBuilder;
@@ -33,14 +32,8 @@ public class TtpService {
 
     @PostConstruct
     public void init() {
-        try {
-            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-            generator.initialize(4096);
-            this.ttpKeyPair = generator.generateKeyPair();
-            System.out.println("TTP: Wygenerowano pare kluczy RSA-4096");
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Blad generowania kluczy RSA", e);
-        }
+        this.ttpKeyPair = CryptoUtils.generateRSAKeyPair();
+        System.out.println("TTP: Wygenerowano pare kluczy RSA-4096");
     }
 
     public PublicKey getTtpPublicKey() {
@@ -50,14 +43,10 @@ public class TtpService {
     public RegisterResponse register(RegisterRequest request) {
         try {
             //dekodujemy klucz publiczny
-            byte[] publicKeyBytes = Base64.getDecoder().decode(request.getPublicKey());
-            PublicKey senderPublicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(publicKeyBytes));
+            PublicKey senderPublicKey = CryptoUtils.base64ToPublicKey(request.getPublicKey());
 
             //deszyfrujemy id kluczem prywatnym ttp
-            Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-            cipher.init(Cipher.DECRYPT_MODE, ttpKeyPair.getPrivate());
-            byte[] decryptedIdBytes = cipher.doFinal(Base64.getDecoder().decode(request.getEncryptedId()));
-            String entityId = new String(decryptedIdBytes);
+            String entityId = CryptoUtils.decryptWithPrivateKey(ttpKeyPair.getPrivate(), request.getEncryptedId());
 
             //sprawdzamy czy juz istnieje
             if (dataStore.exists(entityId)) {
@@ -103,10 +92,8 @@ public class TtpService {
                 subjectPublicKey
         );
 
-        ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA")
-                .build(ttpPrivateKey);
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(ttpPrivateKey);
 
-        return new JcaX509CertificateConverter()
-                .getCertificate(certBuilder.build(signer));
+        return new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
     }
 }
