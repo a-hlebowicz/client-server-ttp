@@ -23,6 +23,19 @@ public class TtpDataStore {
         return registered.containsKey(entityId);
     }
 
+    public RegisteredEntity find(String entityId) {
+        return registered.get(entityId);
+    }
+
+    public RegisteredEntity findByName(String name) {
+        for (RegisteredEntity entity : registered.values()) {
+            if (entity.getName().equals(name)) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
     @Data
     @AllArgsConstructor
     public static class RegisteredEntity {

@@ -2,14 +2,17 @@ package org.example.service;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.example.dto.RegisterRequest;
-import org.example.dto.RegisterResponse;
+import org.example.dto.*;
 import java.security.*;
 import java.util.Map;
 import org.example.crypto.CryptoUtils;
+
+import javax.crypto.SecretKey;
+
 @Service
 @RequiredArgsConstructor
 public class ServerService {
@@ -22,6 +25,7 @@ public class ServerService {
     private KeyPair serverKeyPair;
     private String serverId;
     private String certificate;
+    private SecretKey sessionKey;
 
     @PostConstruct       //SPRAWDZAMY CZY WIDZI TTP, PÓŹNIEJ WYRZUCIC
     public void init() {
@@ -64,6 +68,63 @@ public class ServerService {
             System.out.println("Server: Blad rejestracji w TTP: " + e.getMessage());
         }
     }
+
+    public AuthServerResponse requestService(ServiceRequest request) {
+        System.out.println("Server: Client " + request.getClientId() + "prosi o usluge");
+
+        AuthServerRequest authRequest = new AuthServerRequest(
+                serverId,
+                certificate,
+                request.getClientId(),
+                request.getClientCertificate()
+        );
+
+        System.out.println("Server: Wysylam request uwierzytelniania do TTP...");
+        AuthServerResponse response = restTemplate.postForObject(
+                ttpUrl + "/api/auth-server",
+                authRequest,
+                AuthServerResponse.class
+        );
+
+        if (response != null) {
+            System.out.println("Server: TTP odpowiedzial: " + response.getMessage());
+        }
+
+        return response;
+    }
+
+    public void receiveSessionKey(SessionKeyNotify notification) {
+        String decryptedKeyBase64 = CryptoUtils.decryptWithPrivateKey(serverKeyPair.getPrivate(), notification.getSessionKey());
+        this.sessionKey = CryptoUtils.base64ToSessionKey(decryptedKeyBase64);
+        System.out.println("Server: Otrzymalem klucz sesyjny od TTP");
+    }
+
+    public ReverseResponse reverse(ReverseRequest request){
+        if (sessionKey == null) {
+            throw new RuntimeException("Brak klucza sesyjnego");
+        }
+        String encryptedText = request.getEncryptedText();
+        String text = CryptoUtils.decryptWithSessionKey(sessionKey,encryptedText);
+        System.out.println("Server: Otrzymano tekst: " + text);
+
+        String reversedText = reverseText(text);
+        System.out.println("Server: Odwrocony tekst: " + reversedText);
+        String encryptedReversedText = CryptoUtils.encryptWithSessionKey(sessionKey,reversedText);
+
+        return new ReverseResponse(encryptedReversedText);
+    }
+
+    private String reverseText(String text){
+        return new StringBuilder(text).reverse().toString();
+    }
+
+    public void endSession() {
+        this.sessionKey = null;
+        System.out.println("Server: Sesja zakonczona");
+    }
+
+
+
     private void pingTtp() {
         System.out.println("Server pinguje TTP");
         try {

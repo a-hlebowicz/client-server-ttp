@@ -3,30 +3,31 @@ package org.example.service;
 import lombok.RequiredArgsConstructor;
 import org.example.crypto.CryptoUtils;
 import org.example.data.TtpDataStore;
-import org.example.dto.RegisterRequest;
-import org.example.dto.RegisterResponse;
+import org.example.dto.*;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.web.client.RestTemplate;
+
+import javax.crypto.SecretKey;
 import java.security.*;
 
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 
-import org.bouncycastle.cert.X509v3CertificateBuilder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
-import org.bouncycastle.operator.ContentSigner;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
-import javax.security.auth.x500.X500Principal;
-import java.math.BigInteger;
-import java.util.Date;
+import static org.example.crypto.CryptoUtils.base64ToCertificate;
+import static org.example.crypto.CryptoUtils.createCertificate;
+
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
 public class TtpService {
 
     private final TtpDataStore dataStore;
+    private final RestTemplate restTemplate;
+    @Value("${app-server.url}")
+    private String serverUrl;
 
     private KeyPair ttpKeyPair;
 
@@ -54,10 +55,7 @@ public class TtpService {
             }
 
             //tworzymy certyfikat X.509
-            X509Certificate certificate = createCertificate(
-                    request.getName(), senderPublicKey,
-                    ttpKeyPair.getPrivate(), ttpKeyPair.getPublic()
-            );
+            X509Certificate certificate = createCertificate(request.getName(), senderPublicKey, ttpKeyPair.getPrivate());
 
             //zapisujemy
             dataStore.register(entityId, request.getName(), senderPublicKey, certificate);
@@ -73,27 +71,75 @@ public class TtpService {
         }
     }
 
-    private X509Certificate createCertificate(String subjectName, PublicKey subjectPublicKey, PrivateKey ttpPrivateKey, PublicKey ttpPublicKey)
-            throws Exception {
+    public AuthServerResponse authServer (AuthServerRequest request){
+        try {
+            //czy istnieje
+            if (!dataStore.exists(request.getServerId())) {
+                return new AuthServerResponse("error", "Server niezarejestrowany");
+            }
+            if (!dataStore.exists(request.getClientId())) {
+                return new AuthServerResponse("error", "Client niezarejestrowany");
+            }
 
-        X500Principal issuer = new X500Principal("CN=TTP");
-        X500Principal subject = new X500Principal("CN=" + subjectName);
+            //sprawdzamy certyfikat
+            X509Certificate serverCert = base64ToCertificate(request.getServerCertificate());
+            serverCert.verify(ttpKeyPair.getPublic());
 
-        BigInteger serialNumber = new BigInteger(64, new SecureRandom());
-        Date notBefore = new Date();
-        Date notAfter = new Date(notBefore.getTime() + 100L * 24 * 60 * 60 * 1000);
+            System.out.println("TTP: Server " + request.getServerId() + "uwierzytelniony");
+            return new AuthServerResponse("server_auth_ok", "Server uwierzytelniony");
 
-        X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
-                issuer,
-                serialNumber,
-                notBefore,
-                notAfter,
-                subject,
-                subjectPublicKey
-        );
+        } catch (Exception e){
+            System.out.println("TTP: Blad uwierzytelniania Servera: " + e.getMessage());
+            return new AuthServerResponse("error", "Blad weryfikacji x509: " + e.getMessage());
+        }
+    }
 
-        ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(ttpPrivateKey);
+    public AuthClientResponse authClient(AuthClientRequest request){
+        try{
+            String clientId = validateAndGetClientId(request);
+            SecretKey sessionKey = CryptoUtils.generateSessionKey();
 
-        return new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
+            PublicKey clientPublicKey = dataStore.find(clientId).getPublicKey();
+            String sessionKeyBase64 = CryptoUtils.sessionKeyToBase64(sessionKey);
+            sendSessionKeyToServer(sessionKey);
+            System.out.println("TTP: Klucz sesyjny wyslany do Clienta");
+            return new AuthClientResponse(
+                    "client_auth_ok",
+                    "Client uwierzytelniony",
+                    CryptoUtils.encryptWithPublicKey(clientPublicKey, sessionKeyBase64)
+            );
+
+        } catch(Exception e){
+            System.out.println("TTP: Blad uwierzytelniania Clienta: " + e.getMessage());
+            return new AuthClientResponse("error", e.getMessage(), null);
+        }
+    }
+    private String validateAndGetClientId(AuthClientRequest request) throws Exception {
+        String clientId = CryptoUtils.decryptWithPrivateKey(
+                ttpKeyPair.getPrivate(), request.getEncryptedClientId());
+
+        if (!dataStore.exists(clientId)) {
+            throw new RuntimeException("Client niezarejestrowany");
+        }
+
+        X509Certificate clientCert = base64ToCertificate(request.getClientCertificate());
+        clientCert.verify(ttpKeyPair.getPublic());
+
+        System.out.println("TTP: Client " + clientId + "zweryfikowany");
+        return clientId;
+    }
+    private void sendSessionKeyToServer(SecretKey sessionKey) {
+        TtpDataStore.RegisteredEntity server = dataStore.findByName("Server");
+        if (server == null) {
+            throw new RuntimeException("Server niezarejestrowany");
+        }
+
+        String sessionKeyBase64 = CryptoUtils.sessionKeyToBase64(sessionKey);
+        String encryptedForServer = CryptoUtils.encryptWithPublicKey(server.getPublicKey(), sessionKeyBase64);
+
+        SessionKeyNotify notification = new SessionKeyNotify("client_auth_ok", encryptedForServer);
+        restTemplate.postForObject(serverUrl + "/api/notify-session-key", notification, Void.class);
+
+        System.out.println("TTP: Klucz sesyjny wyslany do Servera");
     }
 }

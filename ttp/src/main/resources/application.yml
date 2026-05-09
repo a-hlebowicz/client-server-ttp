@@ -4,3 +4,6 @@ server:
 spring:
   application:
     name: ttp
+
+app-server:
+  url: http://localhost:5001

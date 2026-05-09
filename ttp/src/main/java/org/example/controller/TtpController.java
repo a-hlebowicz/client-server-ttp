@@ -1,7 +1,6 @@
 package org.example.controller;
 import lombok.RequiredArgsConstructor;
-import org.example.dto.RegisterRequest;
-import org.example.dto.RegisterResponse;
+import org.example.dto.*;
 import org.example.service.TtpService;
 import org.springframework.http.ResponseEntity;
 //import org.springframework.web.bind.annotation.GetMapping;
@@ -36,5 +35,16 @@ public class TtpController {
     public ResponseEntity<RegisterResponse> register(@RequestBody RegisterRequest request) {
         RegisterResponse response = ttpService.register(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/auth-server")
+    public ResponseEntity<AuthServerResponse> authServer(@RequestBody AuthServerRequest request) {
+        AuthServerResponse response = ttpService.authServer(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/auth-client")
+    public ResponseEntity<AuthClientResponse> authenticateUser(@RequestBody AuthClientRequest request) {
+        return ResponseEntity.ok(ttpService.authClient(request));
     }
 }
