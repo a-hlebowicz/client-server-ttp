@@ -1,0 +1,15 @@
+<div class="status">
+  @if (ping(); as p) {
+  <p>Backend: <strong>{{ p.status }}</strong> ({{ p.service }})</p>
+  } @else {
+  <p>Backend: ładowanie...</p>
+  }
+
+  <p>
+    Sesja:
+    @if (sessionActive) {
+    <strong class="active">aktywna</strong>
+    } @else {
+    <strong class="inactive">nieaktywna</strong>    }
+  </p>
+</div>

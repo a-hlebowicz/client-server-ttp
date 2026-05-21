@@ -1,0 +1,28 @@
+<div class="panel">
+
+  <div class="buttons">
+    <button (click)="onStart()" [disabled]="sessionActive">
+      Rozpocznij sesję
+    </button>
+    <button (click)="onEnd()" [disabled]="!sessionActive">
+      Zakończ sesję
+    </button>
+  </div>
+
+  @if (sessionActive) {
+  <div class="reverse-form">
+    <input #textInput type="text" placeholder="Tekst do odwrócenia">
+    <button (click)="onReverse(textInput.value); textInput.value = ''">
+      Odwróć
+    </button>
+  </div>
+  }
+
+  @if (lastResult(); as result) {
+  <p>Wynik: <strong>{{ result }}</strong></p>
+  }
+
+  @if (errorMessage(); as msg) {
+  <p class="error">{{ msg }}</p>
+  }
+</div>

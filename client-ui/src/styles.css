@@ -1,0 +1,68 @@
+/* You can add global styles to this file, and also import other style files */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #1a1a1a;
+  color: #d4d4d4;
+  margin: 0;
+  padding: 2rem 1rem;
+  line-height: 1.5;
+}
+
+app-root {
+  display: block;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+h1 {
+  text-align: center;
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0 0 2rem 0;
+}
+
+.status,
+.panel {
+  border: 1px solid #555;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.status p,
+.panel p {
+  margin: 0.4rem 0;
+}
+
+.active   { color: #6abf69; }
+.inactive { color: #e57373; }
+.error    { color: #e57373; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: #2a2a2a;
+  border: 1px solid #555;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  background: #333;
+}
+button:disabled {
+  color: #666;
+  border-color: #3a3a3a;
+  cursor: not-allowed;
+}
+
+input[type="text"] {
+  font: inherit;
+  color: inherit;
+  background: #2a2a2a;
+  border: 1px solid #555;
+  padding: 0.4rem 0.6rem;
+  flex: 1;
+}
+input[type="text"]:focus {
+  outline: none;
+  border-color: #888;
+}

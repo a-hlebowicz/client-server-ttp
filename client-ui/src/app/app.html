@@ -1,0 +1,9 @@
+<h1>CLIENT - SERVER - TTP</h1>
+
+<app-status [sessionActive]="sessionActive()"></app-status>
+
+<app-service-panel
+  [sessionActive]="sessionActive()"
+  (sessionStarted)="onSessionStarted()"
+  (sessionEnded)="onSessionEnded()">
+</app-service-panel>
