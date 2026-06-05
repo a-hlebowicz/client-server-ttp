@@ -1,0 +1,25 @@
+services:
+  ttp:
+    build:
+      context: .
+      dockerfile: ttp/Dockerfile
+    image: ttp:latest
+    container_name: ttp
+    ports:
+      - "5000:5000"
+    environment:
+      - APP_SERVER_URL=http://server:5001
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: server:latest
+    container_name: server
+    ports:
+      - "5001:5001"
+    environment:
+      - TTP_URL=http://ttp:5000
+    depends_on:
+      - ttp
+    restart: on-failure

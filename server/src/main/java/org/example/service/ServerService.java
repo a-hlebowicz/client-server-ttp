@@ -31,7 +31,7 @@ public class ServerService {
     public void init() {
         generateKeys();
         generateId();
-        registerWithTtp();
+        registerWithTtpRetry();
     }
     private void generateKeys() {
         this.serverKeyPair = CryptoUtils.generateRSAKeyPair();
@@ -43,29 +43,49 @@ public class ServerService {
         System.out.println("Server: Wygenerowano ID: " + serverId);
     }
 
-    private void registerWithTtp() {
-        try {
-            //pobieramy klucz publiczny ttp
-            Map response = restTemplate.getForObject(ttpUrl + "/api/ttp-public-key", Map.class);
-            PublicKey ttpPublicKey = CryptoUtils.base64ToPublicKey((String) response.get("publicKey"));
-            System.out.println("Server: Pobrano klucz publiczny TTP");
+    private void registerWithTtpRetry() {
+        final int maxAtemps = 10;
+        final long delayMs = 3000;
 
-            //szyfrujemy ID kluczem publicznym ttp
-            String encryptedIdBase64 = CryptoUtils.encryptWithPublicKey(ttpPublicKey, serverId);
-
-            //wysylamy rejestracje do ttp
-            String publicKeyBase64 = CryptoUtils.publicKeyToBase64(serverKeyPair.getPublic());
-            RegisterRequest request = new RegisterRequest(encryptedIdBase64, publicKeyBase64, "Server");
-            RegisterResponse regResponse = restTemplate.postForObject(
-                    ttpUrl + "/api/register", request, RegisterResponse.class);
-
-            if (regResponse != null) {
-                this.certificate = regResponse.getCertificate();
-                System.out.println("Server: " + regResponse.getMessage());
+        for (int attempt = 1; maxAtemps >= attempt; attempt++){
+            try {
+                registerWithTtp();
+                System.out.println("Server: rejestracja w TTP udana, próba " + attempt);
+                return;
+            } catch (Exception e) {
+                if (attempt == maxAtemps) {
+                    throw new IllegalStateException("Server: nie udało się zarejestrować w TTP, próby " + attempt);
+                }
+                System.out.println("Server: Błąd rejestracji w TTP (" + e.getMessage() + ") - rejestracja nieudana, próba " + attempt);
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException ee) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Server: przerwano oczekiwanie na TTP", ee);
+                }
             }
+        }
+    }
 
-        } catch (Exception e) {
-            System.out.println("Server: Blad rejestracji w TTP: " + e.getMessage());
+
+    private void registerWithTtp() {
+        //pobieramy klucz publiczny ttp
+        Map response = restTemplate.getForObject(ttpUrl + "/api/ttp-public-key", Map.class);
+        PublicKey ttpPublicKey = CryptoUtils.base64ToPublicKey((String) response.get("publicKey"));
+        System.out.println("Server: Pobrano klucz publiczny TTP");
+
+        //szyfrujemy ID kluczem publicznym ttp
+        String encryptedIdBase64 = CryptoUtils.encryptWithPublicKey(ttpPublicKey, serverId);
+
+        //wysylamy rejestracje do ttp
+        String publicKeyBase64 = CryptoUtils.publicKeyToBase64(serverKeyPair.getPublic());
+        RegisterRequest request = new RegisterRequest(encryptedIdBase64, publicKeyBase64, "Server");
+        RegisterResponse regResponse = restTemplate.postForObject(
+                ttpUrl + "/api/register", request, RegisterResponse.class);
+
+        if (regResponse != null) {
+            this.certificate = regResponse.getCertificate();
+            System.out.println("Server: " + regResponse.getMessage());
         }
     }
 
