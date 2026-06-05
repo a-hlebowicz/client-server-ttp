@@ -19,8 +19,12 @@ export class ServicePanel {
   onStart(): void {
     this.errorMessage.set(null);
     this.api.startService().subscribe({
-      next: () => {
-        this.sessionStarted.emit();
+      next: (response) => {
+        if (response.status === 'client_auth_ok') {
+          this.sessionStarted.emit();
+        } else {
+          this.errorMessage.set(response.message || 'Nie udało się rozpocząć sesji');
+        }
       },
       error: (err) => {
         this.errorMessage.set('Nie udało się rozpocząć sesji');
@@ -45,9 +49,13 @@ export class ServicePanel {
   onEnd(): void {
     this.errorMessage.set(null);
     this.api.endSession().subscribe({
-      next: () => {
-        this.sessionEnded.emit();
-        this.lastResult.set(null);
+      next: (response) => {
+        if (response.status === 'session_ended') {
+          this.sessionEnded.emit();
+          this.lastResult.set(null);
+        } else {
+          this.errorMessage.set('Nie udało się zakończyć sesji');
+        }
       },
       error: (err) => {
         this.errorMessage.set('Błąd przy kończeniu sesji');
