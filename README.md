@@ -106,7 +106,7 @@ Success:
 
 ### `POST /api/reverse`
 
-Sending text to be reversed. Requires an active session (first start-service).
+Sending text to be reversed. Requires an active session (call start-service first).
 
 Body:
 
@@ -172,13 +172,13 @@ For `/reverse`:
 
 ## Cryptography
 
-- RSA 4096, padding OAEP ; rejestracja, certyfikaty
+- RSA 4096, padding OAEP ; registration, certificates
 - AES-256-GCM ; session data
 - SHA-256 ; public IDs of the parties
 - X.509 via Bouncy Castle ; SHA256withRSA signature
 - session keys from a pseudorandom generator
 
-## Struktura projektu
+## Project structure
 
 ```
 .
