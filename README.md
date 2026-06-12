@@ -1,48 +1,51 @@
 # CLIENT-SERVER-TTP
 
-Cztery aplikacje. TTP wystawia certyfikaty X.509 i pośredniczy w uwierzytelnianiu, Server udostępnia usługę (odwracanie tekstu), Client to backend dla Angulara, a Angular to interfejs użytkownika. Zanim klient i serwer zaczną cokolwiek wymieniać, każdy rejestruje się w TTP i dostaje certyfikat. Każda sesja zaczyna się od uwierzytelnienia obu stron przez TTP, który dopiero wtedy wydaje wspólny klucz sesyjny AES-256.
+[![en](https://img.shields.io/badge/lang-en-blue?style=for-the-badge)](README.md)
+[![pl](https://img.shields.io/badge/lang-pl-lightgrey?style=for-the-badge)](README.pl.md)
 
-## Co gdzie chodzi
+Four applications. TTP issues X.509 certificates and mediates authentication, Server provides a service (text reversing), Client is a backend for Angular, and Angular is the user interface. Before the client and server start exchanging anything, each registers with the TTP and receives a certificate. Each session begins with the authentication of both parties by the TTP, which only then issues a shared AES-256 session key.
 
-| Aplikacja        | Port | Gdzie            |
+## What runs where
+
+| Application      | Port | Where            |
 | ---------------- | ---- | ---------------- |
 | TTP              | 5000 | Docker           |
 | Server           | 5001 | Docker           |
-| Client (backend) | 5002 | maszyna fizyczna |
-| Angular (UI)     | 4200 | maszyna fizyczna |
+| Client (backend) | 5002 | physical machine |
+| Angular (UI)     | 4200 | physical machine |
 
-Podział wynika z założeń projektu: TTP i Server emulują dwie maszyny (kontenery), a aplikacja użytkownika (Client backend + Angular) chodzi na maszynie fizycznej.
+The division results from the project assumptions: TTP and Server emulate two machines (containers), and the user application (Client backend + Angular) runs on a physical machine.
 
 ## Stack
 
 - Java 21
 - Spring Boot 3.3.4
 - Lombok
-- Bouncy Castle (do certyfikatów X.509)
+- Bouncy Castle (for X.509 certificates)
 - Maven (multi-module)
 - Angular 21
 - Docker
 
-## Jak odpalić
+## How to run
 
-### Wariant z Dockerem (TTP + Server w kontenerach)
+### Variant with Docker (TTP + Server in containers)
 
-Z katalogu głównego projektu:
+From the root directory of the project:
 
 ```
 docker compose up --build
 ```
-
-Wstaje TTP (5000) i Server (5001). Potem na maszynie fizycznej odpalamy backend Clienta i UI:
+TTP (5000) and Server (5001) start up. Then on the physical machine, we run the Client backend and UI:
 
 ```
 client/    -> ClientApplication          (port 5002)
 client-ui/ -> npm install && npm start    (port 4200)
+
 ```
 
-### Wariant lokalny
+### Local variant
 
-W tej kolejności (Server i Client czekają na TTP):
+In this order (Server and Client wait for TTP):
 
 ```
 ttp/    -> TtpApplication
@@ -50,32 +53,31 @@ server/ -> ServerApplication
 client/ -> ClientApplication
 ```
 
-A na koniec UI:
-
+And then the UI:
 ```
 client-ui/ -> npm install && npm start
 ```
 
-UI otwiera się na http://localhost:4200.
+UI opens at http://localhost:4200.
 
-## Interfejs (Angular)
+## Interface (Angular)
 
-Prosty single-page. 
+Simple single-page. 
 
-Komponenty:
+Components:
 
-- `StatusComponent` ; pokazuje stan backendu (z `/api/ping`) oraz czy sesja jest aktywna. Dostaje `sessionActive` przez `@Input`.
-- `ServicePanelComponent` ; przyciski "Rozpocznij sesję" / "Zakończ sesję" oraz pole do odwracania tekstu (widoczne tylko przy aktywnej sesji). Emituje `sessionStarted` / `sessionEnded` przez `@Output`.
+- `StatusComponent` ; shows the backend state (from `/api/ping`) and whether the session is active. Receives `sessionActive` via `@Input`.
+- `ServicePanelComponent` ; "Start session" / "End session" buttons and a field for reversing text (visible only when the session is active). Emits `sessionStarted` / `sessionEnded` via `@Output`.
 
-## Endpointy (Client backend, port 5002)
+## Endpoints (Client backend, port 5002)
 
-Wszystkie pod `/api`.
+All under `/api`.
 
 ### `GET /api/ping`
 
-Health check. Sprawdzić czy backend chodzi.
+Health check. Check if the backend is running.
 
-Odpowiedź:
+Response:
 
 ```
 {
@@ -84,14 +86,13 @@ Odpowiedź:
   "status": "ok"
 }
 ```
-
 ### `POST /api/start-service`
 
-Nawiązanie sesji. Wewnętrznie: client wysyła service request do Servera, Server prosi TTP o uwierzytelnienie, TTP waliduje, Client uwierzytelnia się w TTP, dostaje klucz sesyjny AES-256.
+Establishing a session. Internally: client sends a service request to the Server, Server asks TTP for authentication, TTP validates, Client authenticates with TTP, receives an AES-256 session key.
 
-Bez ciała.
+No body.
 
-Sukces:
+Success:
 
 ```
 {
@@ -101,13 +102,13 @@ Sukces:
 }
 ```
 
-`sessionKey` w odpowiedzi to zaszyfrowany klucz, Angular nic z nim nie robi (deszyfrowanie idzie po stronie backendu Clienta).
+`sessionKey` in the response is an encrypted key, Angular does nothing with it (decryption happens on the Client backend side).
 
 ### `POST /api/reverse`
 
-Wysłanie tekstu do odwrócenia. Wymaga aktywnej sesji (najpierw `start-service`).
+Sending text to be reversed. Requires an active session (first start-service).
 
-Ciało:
+Body:
 
 ```
 {
@@ -115,7 +116,7 @@ Ciało:
 }
 ```
 
-Odpowiedź:
+Response:
 
 ```
 {
@@ -123,15 +124,13 @@ Odpowiedź:
 }
 ```
 
-
-
 ### `POST /api/end-session`
 
-Zakończenie sesji. Czyści klucz po obu stronach (Client i Server).
+Ending the session. Clears the key on both sides (Client and Server).
 
-Bez ciała.
+No body.
 
-Odpowiedź:
+Response:
 
 ```
 {
@@ -139,46 +138,45 @@ Odpowiedź:
 }
 ```
 
-## Jak działa
+## How it works
 
-Pełen przepływ przy `/start-service`:
-
+Full flow for `/start-service`:
 ```
 1. Angular        -> Client backend  : POST /api/start-service
-2. Client backend -> Server          : POST /api/request-service (ID + cert clienta)
-3. Server         -> TTP             : POST /api/auth-server     (oba ID + oba certyfikaty)
-4. TTP weryfikuje certyfikat Servera (sprawdza podpis TTP)
+2. Client backend -> Server          : POST /api/request-service (ID + client cert)
+3. Server         -> TTP             : POST /api/auth-server     (both IDs + both certificates)
+4. TTP verifies the Server's certificate (checks TTP signature)
 5. TTP            -> Server          : "server_auth_ok"
 6. Server         -> Client backend  : "server_auth_ok"
-7. Client backend -> TTP             : POST /api/auth-client (zaszyfrowane ID + cert)
-8. TTP weryfikuje Clienta i certyfikat
-9. TTP generuje losowy klucz sesyjny AES-256
-10. TTP          -> Server           : POST /api/notify-session-key (klucz dla Servera)
-11. TTP          -> Client backend   : odpowiedź na (7) z kluczem dla Clienta
-12. Server i Client mają ten sam klucz AES-256, mogą gadać szyfrowane
+7. Client backend -> TTP             : POST /api/auth-client (encrypted ID + cert)
+8. TTP verifies the Client and the certificate
+9. TTP generates a random AES-256 session key
+10. TTP          -> Server           : POST /api/notify-session-key (key for Server)
+11. TTP          -> Client backend   : response to (7) with key for Client
+12. Server and Client have the same AES-256 key, they can talk encrypted
 ```
 
-Wszystkie klucze sesyjne są szyfrowane RSA kluczem publicznym odbiorcy (więc tylko on je odszyfruje).
+All session keys are encrypted with RSA using the recipient's public key (so only the recipient can decrypt them).
 
-Przy `/reverse`:
+For `/reverse`:
 
 ```
 1. Angular        -> Client backend  : POST /api/reverse {"text": "pies"}
-2. Client backend szyfruje tekst AES-256-GCM (z losowym nonce)
-3. Client backend -> Server          : POST /api/reverse (zaszyfrowany tekst)
-4. Server deszyfruje, odwraca, szyfruje wynik
-5. Server         -> Client backend  : zaszyfrowana odpowiedź
-6. Client backend deszyfruje
+2. Client backend encrypts the text with AES-256-GCM (with a random nonce)
+3. Client backend -> Server          : POST /api/reverse (encrypted text)
+4. Server decrypts, reverses, encrypts the result
+5. Server         -> Client backend  : encrypted response
+6. Client backend decrypts
 7. Client backend -> Angular         : {"reversed": "seip"}
 ```
 
-## Kryptografia
+## Cryptography
 
 - RSA 4096, padding OAEP ; rejestracja, certyfikaty
-- AES-256-GCM ; dane sesyjne
-- SHA-256 ; publiczne ID stron
-- X.509 przez Bouncy Castle ; podpis SHA256withRSA
-- klucze sesyjne z generatora pseudolosowego
+- AES-256-GCM ; session data
+- SHA-256 ; public IDs of the parties
+- X.509 via Bouncy Castle ; SHA256withRSA signature
+- session keys from a pseudorandom generator
 
 ## Struktura projektu
 
@@ -186,7 +184,7 @@ Przy `/reverse`:
 .
 ├── pom.xml                 (parent POM)
 ├── docker-compose.yml      (TTP + Server)
-├── shared/                 (CryptoUtils ; generowanie kluczy, szyfrowanie, certyfikaty)
+├── shared/                 (CryptoUtils ; key generation, encryption, certificates)
 ├── ttp/                    (TTP, port 5000)
 ├── server/                 (Server, port 5001)
 ├── client/                 (Client backend, port 5002)
