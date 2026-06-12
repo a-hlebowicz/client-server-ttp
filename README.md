@@ -40,7 +40,6 @@ TTP (5000) and Server (5001) start up. Then on the physical machine, we run the 
 ```
 client/    -> ClientApplication          (port 5002)
 client-ui/ -> npm install && npm start    (port 4200)
-
 ```
 
 ### Local variant
